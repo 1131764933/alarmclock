@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AlarmClock - Test</title>
+  <style>
+    body { font-family: Arial; padding: 20px; background: #0f0f23; color: #fff; }
+    button { padding: 15px 30px; font-size: 18px; cursor: pointer; background: #6366f1; color: white; border: none; border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <h1>Test MetaMask Connection</h1>
+  <button id="connectBtn">Connect Wallet</button>
+  <p id="status"></p>
+  
+  <script>
+    const btn = document.getElementById('connectBtn')
+    const status = document.getElementById('status')
+    
+    btn.addEventListener('click', async () => {
+      status.textContent = 'Checking for MetaMask...'
+      
+      if (typeof window.ethereum === 'undefined') {
+        status.textContent = 'MetaMask not found! Please install it.'
+        return
+      }
+      
+      status.textContent = 'MetaMask found, requesting accounts...'
+      
+      try {
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' })
+        status.textContent = 'Connected: ' + accounts[0]
+      } catch (err) {
+        status.textContent = 'Error: ' + err.message
+      }
+    })
+  </script>
+</body>
+</html>

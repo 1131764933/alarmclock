@@ -1,0 +1,1 @@
+{"id":"e19b226c3dcc4da3","source_id_to_path":{"0":"contracts/AlarmClock.sol","1":"lib/openzeppelin-contracts/contracts/access/Ownable.sol","2":"lib/openzeppelin-contracts/contracts/utils/Context.sol","3":"lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol","4":"lib/openzeppelin-contracts/contracts/utils/StorageSlot.sol"},"language":"Solidity"}

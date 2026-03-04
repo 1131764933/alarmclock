@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Add Anvil Network to MetaMask</title>
+</head>
+<body>
+  <h1>Click the button to add Anvil local network to MetaMask</h1>
+  <button id="addNetwork">Add Anvil Network</button>
+  
+  <script>
+    document.getElementById('addNetwork').addEventListener('click', async () => {
+      if (typeof window.ethereum === 'undefined') {
+        alert('Please install MetaMask first!');
+        return;
+      }
+      
+      try {
+        await window.ethereum.request({
+          method: 'wallet_addEthereumChain',
+          params: [{
+            chainId: '0x7A69', // 31337 in hex
+            chainName: 'Anvil Local',
+            nativeCurrency: {
+              name: 'Ethereum',
+              symbol: 'ETH',
+              decimals: 18
+            },
+            rpcUrls: ['http://127.0.0.1:8545']
+          }]
+        });
+        alert('Network added successfully!');
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+    });
+  </script>
+</body>
+</html>
