@@ -312,9 +312,27 @@ function App() {
     setLoading(true)
 
     try {
-      const startTimestamp = Math.floor(new Date(startTime).getTime() / 1000)
-      const endTimestamp = Math.floor(new Date(endTime).getTime() / 1000)
+      // 正确解析 datetime-local 输入
+      // datetime-local 返回的是本地时间，不需要时区转换
+      const parseDateTimeLocal = (value) => {
+        // datetime-local 格式: "YYYY-MM-DDTHH:mm"
+        // JavaScript Date 构造函数会正确解析为本地时间
+        const dateObj = new Date(value)
+        return Math.floor(dateObj.getTime() / 1000)
+      }
+      
+      const startTimestamp = parseDateTimeLocal(startTime)
+      const endTimestamp = parseDateTimeLocal(endTime)
       const parsedAmount = parseFloat(amount)
+
+      console.log("=== Create Alarm Debug ===")
+      console.log("startTime input:", startTime)
+      console.log("endTime input:", endTime)
+      console.log("startTimestamp:", startTimestamp)
+      console.log("endTimestamp:", endTimestamp)
+      console.log("duration:", endTimestamp - startTimestamp, "seconds")
+      console.log("chainNow:", chainNow)
+      console.log("currentTimestamp:", Math.floor(Date.now() / 1000))
 
       if (Number.isNaN(startTimestamp) || Number.isNaN(endTimestamp)) {
         setError("Invalid time selection.")
@@ -339,12 +357,13 @@ function App() {
 
       const currentTimestamp = chainNow || Math.floor(Date.now() / 1000)
 
-      if (startTimestamp < currentTimestamp) {
-        setError("Start time must be in the future!")
+      // 验证：开始时间必须是未来（至少 5 分钟后，防止交易确认时已过期）
+      const MIN_START_BUFFER = 300 // 5 分钟缓冲
+      if (startTimestamp < currentTimestamp + MIN_START_BUFFER) {
+        setError(`Start time must be at least ${MIN_START_BUFFER / 60} minute(s) in the future to allow for transaction confirmation.`)
         setLoading(false)
         return
       }
-
       const provider = new BrowserProvider(window.ethereum)
       const signer = await provider.getSigner()
       const contract = new Contract(contractAddress, CONTRACT_ABI, signer)
@@ -367,7 +386,21 @@ function App() {
       }, 1500)
       
     } catch (err) {
-      setError("Error: " + (err.message || err.toString()))
+      console.error("Create alarm error:", err)
+      // 尝试解析合约 revert 错误
+      let errorMessage = err.message || err.toString()
+      if (err.data) {
+        // ethers.js v6 格式
+        if (err.data.message) {
+          errorMessage = err.data.message
+        }
+        // 尝试提取 revert 原因
+        const revertMatch = errorMessage.match(/reason[:\s]+([^"'\\]+)/)
+        if (revertMatch) {
+          errorMessage = "Contract reverted: " + revertMatch[1].trim()
+        }
+      }
+      setError("Error: " + errorMessage)
     }
 
     setLoading(false)
@@ -418,7 +451,21 @@ function App() {
         loadStats()
       }, 1000)
     } catch (err) {
-      setError("Error: " + (err.message || err.toString()))
+      console.error("Cancel alarm error:", err)
+      let errorMessage = err.message || err.toString()
+      // 解析合约错误
+      if (errorMessage.includes('0xcd1256ef')) {
+        errorMessage = "Cannot cancel: alarm start time has passed. You can only trigger the alarm or wait for it to expire."
+      } else if (errorMessage.includes('0x1878fe86')) {
+        errorMessage = "You are not the owner of this alarm."
+      } else if (errorMessage.includes('0x1b77d1c2')) {
+        errorMessage = "Alarm has already been triggered."
+      } else if (errorMessage.includes('0x5f38b019')) {
+        errorMessage = "Alarm has already been cancelled."
+      } else if (errorMessage.includes('0x2dcatr4b')) {
+        errorMessage = "Alarm has already expired."
+      }
+      setError("Error: " + errorMessage)
     }
     setLoading(false)
   }

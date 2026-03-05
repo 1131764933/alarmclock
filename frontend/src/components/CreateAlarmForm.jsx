@@ -7,10 +7,23 @@ export function CreateAlarmForm({ chainNow, onCreate, loading, error, success })
 
   useEffect(() => {
     if (chainNow) {
-      const start = new Date((chainNow + 60) * 1000)
-      const end = new Date((chainNow + 120) * 1000)
-      setStartTime(start.toISOString().slice(0, 16))
-      setEndTime(end.toISOString().slice(0, 16))
+      // 将链上时间转换为本地时间用于显示
+      const formatForInput = (timestamp) => {
+        const date = new Date(timestamp * 1000)
+        // 格式化为 YYYY-MM-DDTHH:mm（datetime-local 格式）
+        const year = date.getFullYear()
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const day = String(date.getDate()).padStart(2, '0')
+        const hours = String(date.getHours()).padStart(2, '0')
+        const minutes = String(date.getMinutes()).padStart(2, '0')
+        return `${year}-${month}-${day}T${hours}:${minutes}`
+      }
+      
+      // 默认从 5 分钟后开始（给交易确认留出时间）
+      const startTimestamp = chainNow + 300
+      const endTimestamp = chainNow + 360
+      setStartTime(formatForInput(startTimestamp))
+      setEndTime(formatForInput(endTimestamp))
     }
   }, [chainNow])
 
@@ -26,7 +39,7 @@ export function CreateAlarmForm({ chainNow, onCreate, loading, error, success })
         Chain time: {chainNow ? new Date(chainNow * 1000).toLocaleString() : 'Loading...'}
       </p>
       <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-        Minimum deposit 0.01 ETH, maximum duration 1 hour.
+        Minimum deposit 0.01 ETH, maximum duration 1 hour. Start time must be at least 5 minutes in the future.
       </p>
       {error && <div className="error">{error}</div>}
       {success && <div className="success">{success}</div>}
