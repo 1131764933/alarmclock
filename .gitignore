@@ -1,0 +1,34 @@
+# Hardhat/区块链相关
+artifacts/
+cache/
+node_modules/
+.env
+.env.local
+foundry.tar.gz
+
+# 前端相关
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.env
+frontend/.env.local
+
+# 系统跨平台文件
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+nul
+# 编辑器/IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Foundry 相关（如果有）
+out/
+forge-artifacts/
