@@ -11,8 +11,8 @@
 | 层级 | 技术 |
 |------|------|
 | 智能合约 | Solidity 0.8.20 + OpenZeppelin |
-| 开发框架 | Foundry (Forge) |
-| 测试 | Forge Std |
+| 开发框架 | Foundry (主) + Hardhat (备选) |
+| 测试 | Forge Std / Mocha + Chai |
 | 前端 | React 18 + Vite + Ethers.js |
 | 钱包 | MetaMask |
 
@@ -20,7 +20,7 @@
 
 1. **创建闹钟** - 用户设置起始时间和结束时间，存入 ETH 保证金（**至少 0.01 ETH**）
 2. **时间段验证** - 使用 `block.timestamp` 精确检测当前块时间，闹钟持续时间**不超过 1 小时**
-3. **触发取回** - 在时间范围内调用 `triggerAlarm()` 取回存款 + 奖励
+3. **触发取回** - 在时间范围内调用 `triggerAlarm()` 取回存款
 4. **过期没收** - 超过结束时间未触发，保证金归合约/社区
 5. **提前取消** - 起始时间之前可取消，取回全部存款
 
@@ -32,6 +32,7 @@ AlarmClock (核心合约)
 ├── triggerAlarm()    - 触发并取回存款
 ├── cancelAlarm()     - 取消（起始时间前）
 ├── checkExpiredAlarm()- 检查过期状态
+├── withdrawForfeited()- 管理员提取没收金额
 └── 事件
     ├── AlarmCreated
     ├── AlarmTriggered
@@ -56,42 +57,50 @@ forge install
 cd frontend && npm install
 ```
 
-### 2. 运行测试
+### 2. 启动本地区块链
 
 ```bash
-forge test -vv
+# 使用 Anvil (Foundry)
+anvil --chain-id 31337 --host 127.0.0.1 --port 8545
 ```
 
 ### 3. 部署合约
 
 ```bash
-# 3.1 本地 Anvil / Hardhat 网络（推荐）
-# 先启动本地节点，然后执行：
-forge script script/Deploy.s.sol:DeployScript \
-  --rpc-url http://localhost:8545 \
-  --broadcast
-
-# 3.2 Sepolia 测试网
-# 先在项目根目录复制 .env.example 为 .env，并填好：
-# SEPOLIA_RPC_URL, PRIVATE_KEY, ETHERSCAN_API_KEY
-
-# 使用 foundry.toml 中的 rpc_endpoints & etherscan 配置：
-forge script script/Deploy.s.sol:DeployScript \
-  --rpc-url sepolia \
+# 使用 Foundry
+forge create --rpc-url http://127.0.0.1:8545 \
+  --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
   --broadcast \
-  --verify
+  contracts/AlarmClock.sol:AlarmClock
 ```
 
-### 4. 启动前端
+### 4. 配置前端
 
 ```bash
 cd frontend
+cp .env.example .env
+# 编辑 .env，填入合约地址 VITE_CONTRACT_ADDRESS_31337=0x...
+```
+
+### 5. 启动前端
+
+```bash
 npm run dev
+```
+
+## 运行测试
+
+```bash
+# Foundry 测试
+forge test -vv
+
+# Hardhat 测试
+npx hardhat test
 ```
 
 ## 测试覆盖
 
-```bash
+```
 ✓ testCreateAlarm              - 创建闹钟成功
 ✓ testCreateAlarmZeroAmount    - 金额为0应失败
 ✓ testCreateAlarmInvalidTimeRange - 无效时间范围
@@ -119,18 +128,68 @@ function cancelAlarm(uint256 alarmId) external;
 // 检查过期
 function checkExpiredAlarm(uint256 alarmId) external;
 
+// 管理员提取没收金额
+function withdrawForfeited(uint256 amount) external;
+
 // 查询
 function alarms(uint256 alarmId) external view returns (Alarm memory);
 function getUserAlarms(address user) external view returns (uint256[]);
 ```
 
-## 项目团队
+## 项目结构
 
-| 角色 | GitHub |
-|------|--------|
-| Team Leader | - |
-| Solidity Contract | [1131764933](https://github.com/1131764933) |
-| Frontend | - |
+```
+alarmclock/
+├── contracts/           # 智能合约 (Foundry)
+│   └── AlarmClock.sol
+├── test/               # 测试 (Foundry)
+│   └── AlarmClock.t.sol
+├── script/             # 部署脚本 (Foundry)
+│   └── Deploy.s.sol
+├── scripts/            # Hardhat 脚本
+│   └── deploy.js
+├── frontend/           # React 前端
+│   ├── src/
+│   │   ├── App.jsx
+│   │   └── components/
+│   │       ├── AlarmItem.jsx
+│   │       ├── CreateAlarmForm.jsx
+│   │       ├── Stats.jsx
+│   │       └── AdminPanel.jsx
+│   └── package.json
+├── foundry.toml         # Foundry 配置
+├── hardhat.config.js   # Hardhat 配置
+└── package.json        # 项目依赖
+```
+
+## 教学文档
+
+详细的开发教程请查看 [docs/teaching](./docs/teaching/) 目录：
+
+### Foundry 版本 (推荐)
+- [环境搭建](./docs/teaching/foundry/phase1-env-setup.md)
+- [智能合约开发](./docs/teaching/foundry/phase2-smart-contract.md)
+- [测试](./docs/teaching/foundry/phase3-testing.md)
+- [前端开发](./docs/teaching/foundry/phase4-frontend.md)
+- [部署上线](./docs/teaching/foundry/phase5-deployment.md)
+
+### Hardhat 版本
+- [环境搭建](./docs/teaching/hardhat/phase1-env-setup.md)
+- [智能合约开发](./docs/teaching/hardhat/phase2-smart-contract.md)
+- [测试](./docs/teaching/hardhat/phase3-testing.md)
+- [前端开发](./docs/teaching/hardhat/phase4-frontend.md)
+- [部署上线](./docs/teaching/hardhat/phase5-deployment.md)
+
+## 测试账号
+
+Anvil 启动后会提供 10 个测试账号：
+
+| 账号 | 地址 | 私钥 |
+|------|------|------|
+| #0 | 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 | 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 |
+| #1 | 0x70997970C51812dc3A010C7d01b50e0d17dc79C8 | 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d |
+
+⚠️ **注意**: 这些是测试账号，私钥公开，仅用于本地开发！
 
 ## License
 
