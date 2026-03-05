@@ -1,36 +1,95 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Add Anvil Network to MetaMask</title>
+  <title>Add Network to MetaMask</title>
+  <style>
+    body { font-family: system-ui; max-width: 600px; margin: 50px auto; padding: 20px; }
+    h1 { color: #333; }
+    button { 
+      display: block; 
+      width: 100%; 
+      padding: 15px 20px; 
+      margin: 10px 0;
+      font-size: 16px;
+      cursor: pointer;
+      border: 2px solid #627eea;
+      background: #627eea;
+      color: white;
+      border-radius: 8px;
+    }
+    button:hover { background: #4a6bc7; }
+    .note { color: #666; font-size: 14px; margin-top: 20px; }
+  </style>
 </head>
 <body>
-  <h1>Click the button to add Anvil local network to MetaMask</h1>
-  <button id="addNetwork">Add Anvil Network</button>
+  <h1>添加网络到 MetaMask</h1>
+  
+  <button id="addSepolia">添加 Sepolia 测试网</button>
+  <button id="addAnvil">添加 Anvil 本地网络</button>
+  
+  <div class="note">
+    <p><strong>Sepolia 测试网信息：</strong></p>
+    <ul>
+      <li>RPC: https://sepolia.infura.io/v3/eeed896aed05408ab241e9e9f2dd0ab1</li>
+      <li>Chain ID: 11155111 (0xaa36a7)</li>
+      <li>符号: ETH</li>
+      <li>区块浏览器: https://sepolia.etherscan.io</li>
+    </ul>
+  </div>
   
   <script>
-    document.getElementById('addNetwork').addEventListener('click', async () => {
+    const SEPOLIA_CONFIG = {
+      chainId: '0xaa36a7', // 11155111
+      chainName: 'Sepolia Testnet',
+      nativeCurrency: {
+        name: 'Ethereum',
+        symbol: 'ETH',
+        decimals: 18
+      },
+      rpcUrls: ['https://sepolia.infura.io/v3/eeed896aed05408ab241e9e9f2dd0ab1'],
+      blockExplorerUrls: ['https://sepolia.etherscan.io']
+    };
+
+    const ANVIL_CONFIG = {
+      chainId: '0x7A69', // 31337
+      chainName: 'Anvil Local',
+      nativeCurrency: {
+        name: 'Ethereum',
+        symbol: 'ETH',
+        decimals: 18
+      },
+      rpcUrls: ['http://127.0.0.1:8545']
+    };
+
+    document.getElementById('addSepolia').addEventListener('click', async () => {
       if (typeof window.ethereum === 'undefined') {
-        alert('Please install MetaMask first!');
+        alert('请先安装 MetaMask!');
         return;
       }
-      
       try {
         await window.ethereum.request({
           method: 'wallet_addEthereumChain',
-          params: [{
-            chainId: '0x7A69', // 31337 in hex
-            chainName: 'Anvil Local',
-            nativeCurrency: {
-              name: 'Ethereum',
-              symbol: 'ETH',
-              decimals: 18
-            },
-            rpcUrls: ['http://127.0.0.1:8545']
-          }]
+          params: [SEPOLIA_CONFIG]
         });
-        alert('Network added successfully!');
+        alert('Sepolia 网络添加成功!');
       } catch (err) {
-        alert('Error: ' + err.message);
+        alert('错误: ' + err.message);
+      }
+    });
+
+    document.getElementById('addAnvil').addEventListener('click', async () => {
+      if (typeof window.ethereum === 'undefined') {
+        alert('请先安装 MetaMask!');
+        return;
+      }
+      try {
+        await window.ethereum.request({
+          method: 'wallet_addEthereumChain',
+          params: [ANVIL_CONFIG]
+        });
+        alert('Anvil 网络添加成功!');
+      } catch (err) {
+        alert('错误: ' + err.message);
       }
     });
   </script>
