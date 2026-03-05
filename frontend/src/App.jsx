@@ -1,5 +1,9 @@
 import { useState, useEffect, useMemo } from 'react'
 import { BrowserProvider, Contract, formatEther, parseEther } from 'ethers'
+import { AlarmItem } from './components/AlarmItem'
+import { CreateAlarmForm } from './components/CreateAlarmForm'
+import { Stats } from './components/Stats'
+import { AdminPanel } from './components/AdminPanel'
 
 const CHAIN_CONFIG = {
   31337: {
@@ -14,7 +18,6 @@ const CHAIN_CONFIG = {
   }
 }
 
-// 合约 ABI
 const CONTRACT_ABI = [
   "function createAlarm(uint256 startTime, uint256 endTime) external payable returns (uint256)",
   "function triggerAlarm(uint256 alarmId) external",
@@ -23,12 +26,12 @@ const CONTRACT_ABI = [
   "function withdrawForfeited(uint256 amount) external",
   "function alarms(uint256 alarmId) external view returns (address user, uint256 amount, uint256 startTime, uint256 endTime, uint8 status, uint256 createdAt)",
   "function getUserAlarms(address user) external view returns (uint256[])",
+  "function getContractBalance() external view returns (uint256)",
   "function owner() external view returns (address)",
   "function totalDeposited() external view returns (uint256)",
   "function totalForfeited() external view returns (uint256)"
 ]
 
-// 状态映射
 const STATUS_MAP = {
   0: 'Pending',
   1: 'Triggered', 
@@ -43,14 +46,10 @@ function App() {
   const [totalDeposited, setTotalDeposited] = useState("0")
   const [totalForfeited, setTotalForfeited] = useState("0")
   const [contractOwner, setContractOwner] = useState("")
-  const [withdrawAmount, setWithdrawAmount] = useState("0.01")
   const [chainNow, setChainNow] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
-  const [startTime, setStartTime] = useState("")
-  const [endTime, setEndTime] = useState("")
-  const [amount, setAmount] = useState("0.01")
 
   const activeChain = useMemo(() => (chainId ? CHAIN_CONFIG[chainId] : null), [chainId])
   const contractAddress = activeChain?.contractAddress || ""
@@ -148,7 +147,6 @@ function App() {
     }
   }
 
-  // 通过 getUserAlarms 获取当前用户闹钟ID，再逐个读取详情
   const loadAlarms = async () => {
     if (!account || !isSupportedChain) return
     
@@ -157,21 +155,22 @@ function App() {
       const contract = new Contract(contractAddress, CONTRACT_ABI, provider)
 
       const alarmsData = []
-
       const userAlarmIds = await contract.getUserAlarms(account)
 
       for (const alarmId of userAlarmIds) {
         try {
           const data = await contract.alarms(alarmId)
           if (data && data.amount && data.amount > 0n) {
+            const startTimeNum = Number(data.startTime)
+            const endTimeNum = Number(data.endTime)
             alarmsData.push({
               id: alarmId.toString(),
               amount: formatEther(data.amount),
-              startTime: new Date(Number(data.startTime) * 1000).toLocaleString(),
-              endTime: new Date(Number(data.endTime) * 1000).toLocaleString(),
+              startTime: new Date(startTimeNum * 1000).toLocaleString(),
+              endTime: new Date(endTimeNum * 1000).toLocaleString(),
               status: STATUS_MAP[Number(data.status)] || 'Unknown',
-              startTimeRaw: Number(data.startTime),
-              endTimeRaw: Number(data.endTime)
+              startTimeRaw: startTimeNum,
+              endTimeRaw: endTimeNum
             })
           }
         } catch (e) {
@@ -228,7 +227,9 @@ function App() {
       const provider = new BrowserProvider(window.ethereum)
       const latestBlock = await provider.getBlock("latest")
       if (latestBlock?.timestamp) {
-        setChainNow(Number(latestBlock.timestamp))
+        const newTime = Number(latestBlock.timestamp)
+        console.log("Chain time synced:", newTime, new Date(newTime * 1000).toLocaleString())
+        setChainNow(newTime)
       }
     } catch (err) {
       console.warn("syncChainTime error:", err.message)
@@ -247,6 +248,7 @@ function App() {
   useEffect(() => {
     if (!account || !isSupportedChain) return
 
+    syncChainTime()
     const timer = setInterval(() => {
       syncChainTime()
     }, 5000)
@@ -254,9 +256,19 @@ function App() {
     return () => clearInterval(timer)
   }, [account, chainId, isSupportedChain, contractAddress])
 
-  const handleWithdrawForfeited = async (e) => {
-    e.preventDefault()
-    if (!isOwner || !isSupportedChain) return
+  const handleWithdrawForfeited = async (withdrawAmount) => {
+    if (!isSupportedChain) return
+
+    const isOwner = account && contractOwner && account.toLowerCase() === contractOwner.toLowerCase()
+    if (!isOwner) {
+      setError("Only contract owner can withdraw forfeited funds.")
+      return
+    }
+
+    if (Number(totalForfeited) <= 0) {
+      setError("No forfeited funds available.")
+      return
+    }
 
     setError("")
     setSuccess("")
@@ -284,7 +296,6 @@ function App() {
       setSuccess("Withdraw transaction sent! Hash: " + tx.hash)
       await tx.wait()
       setSuccess("Withdraw successful.")
-      setWithdrawAmount("0.01")
       loadStats()
     } catch (err) {
       setError("Error: " + (err.message || err.toString()))
@@ -293,8 +304,7 @@ function App() {
     setLoading(false)
   }
 
-  const handleCreate = async (e) => {
-    e.preventDefault()
+  const handleCreate = async ({ startTime, endTime, amount }) => {
     if (!account || !isSupportedChain) return
 
     setError("")
@@ -327,13 +337,8 @@ function App() {
         return
       }
 
-      // 获取当前时间戳（秒）
       const currentTimestamp = chainNow || Math.floor(Date.now() / 1000)
-      console.log("Current timestamp:", currentTimestamp)
-      console.log("Start timestamp:", startTimestamp)
-      console.log("End timestamp:", endTimestamp)
 
-      // 额外校验
       if (startTimestamp < currentTimestamp) {
         setError("Start time must be in the future!")
         setLoading(false)
@@ -344,7 +349,6 @@ function App() {
       const signer = await provider.getSigner()
       const contract = new Contract(contractAddress, CONTRACT_ABI, signer)
       
-      // 使用 BigInt 转换参数
       const tx = await contract.createAlarm(BigInt(startTimestamp), BigInt(endTimestamp), {
         value: parseEther(amount)
       })
@@ -352,10 +356,6 @@ function App() {
       setSuccess("Transaction sent! Hash: " + tx.hash)
       await tx.wait()
       setSuccess("Alarm created successfully!")
-
-      setStartTime("")
-      setEndTime("")
-      setAmount("0.01")
       
       setTimeout(() => {
         loadAlarms()
@@ -440,16 +440,7 @@ function App() {
     }
   }
 
-  useEffect(() => {
-    const now = new Date()
-    const start = new Date(now.getTime() + 60 * 60 * 1000)
-    const end = new Date(now.getTime() + 2 * 60 * 60 * 1000)
-    setStartTime(start.toISOString().slice(0, 16))
-    setEndTime(end.toISOString().slice(0, 16))
-  }, [])
-
   const formatAddress = (addr) => addr ? addr.slice(0, 6) + '...' + addr.slice(-4) : ''
-  const isOwner = account && contractOwner && account.toLowerCase() === contractOwner.toLowerCase()
   const nowSec = chainNow || Math.floor(Date.now() / 1000)
 
   return (
@@ -482,77 +473,24 @@ function App() {
 
       {account && isSupportedChain && (
         <>
-          <div className="stats">
-            <div className="stat-card">
-              <h3>Your Alarms</h3>
-              <p>{alarms.length}</p>
-            </div>
-            <div className="stat-card">
-              <h3>Total Deposited</h3>
-              <p>{Number(totalDeposited).toFixed(4)} ETH</p>
-            </div>
-            <div className="stat-card">
-              <h3>Total Forfeited</h3>
-              <p>{Number(totalForfeited).toFixed(4)} ETH</p>
-            </div>
-          </div>
+          <Stats alarms={alarms} totalDeposited={totalDeposited} totalForfeited={totalForfeited} />
 
-          <div className="card">
-            <h3>Create New Alarm</h3>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-              Minimum deposit 0.01 ETH, maximum duration 1 hour.
-            </p>
-            {error && <div className="error">{error}</div>}
-            {success && <div className="success">{success}</div>}
-            
-            <form onSubmit={handleCreate}>
-              <div className="form-group">
-                <label>Start Time</label>
-                <input type="datetime-local" value={startTime} onChange={(e) => setStartTime(e.target.value)} required />
-              </div>
-              <div className="form-group">
-                <label>End Time</label>
-                <input type="datetime-local" value={endTime} onChange={(e) => setEndTime(e.target.value)} required />
-              </div>
-              <div className="form-group">
-                <label>Deposit (ETH)</label>
-                <input type="number" step="0.001" min="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required />
-              </div>
-              <button type="submit" className="btn btn-primary" disabled={loading}>
-                {loading ? 'Processing...' : 'Create Alarm'}
-              </button>
-            </form>
-          </div>
+          <CreateAlarmForm 
+            chainNow={chainNow} 
+            onCreate={handleCreate} 
+            loading={loading} 
+            error={error} 
+            success={success} 
+          />
 
-          <div className="card">
-            <h3>Admin: Withdraw Forfeited</h3>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
-              Owner: {contractOwner ? formatAddress(contractOwner) : 'Loading...'}
-            </p>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-              Available forfeited: {Number(totalForfeited).toFixed(4)} ETH
-            </p>
-            {!isOwner && (
-              <div className="error">Only contract owner can withdraw forfeited funds.</div>
-            )}
-            <form onSubmit={handleWithdrawForfeited}>
-              <div className="form-group">
-                <label>Amount (ETH)</label>
-                <input
-                  type="number"
-                  step="0.001"
-                  min="0.001"
-                  value={withdrawAmount}
-                  onChange={(e) => setWithdrawAmount(e.target.value)}
-                  required
-                  disabled={!isOwner}
-                />
-              </div>
-              <button type="submit" className="btn btn-warning" disabled={loading || !isOwner}>
-                {loading ? 'Processing...' : 'Withdraw Forfeited'}
-              </button>
-            </form>
-          </div>
+          <AdminPanel 
+            contractOwner={contractOwner}
+            account={account}
+            totalForfeited={totalForfeited}
+            onWithdraw={handleWithdrawForfeited}
+            loading={loading}
+            error={error}
+          />
 
           <div className="alarm-list">
             <h3>Your Alarms</h3>
@@ -560,29 +498,15 @@ function App() {
               <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No alarms yet. Create one above!</p>
             ) : (
               alarms.map(alarm => (
-                <div key={alarm.id} className="alarm-item">
-                  <div>
-                    <h4>Alarm #{alarm.id}</h4>
-                    <p>{alarm.startTime} ~ {alarm.endTime}</p>
-                    <p>Deposit: {alarm.amount} ETH</p>
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                    <span className={`status ${alarm.status.toLowerCase()}`}>{alarm.status}</span>
-                    {alarm.status === 'Pending' && (
-                      <>
-                        {nowSec >= alarm.startTimeRaw && nowSec <= alarm.endTimeRaw && (
-                          <button className="btn btn-success" style={{ padding: '0.5rem' }} onClick={() => handleTrigger(alarm.id)}>Trigger</button>
-                        )}
-                        {nowSec < alarm.startTimeRaw && (
-                          <button className="btn btn-danger" style={{ padding: '0.5rem' }} onClick={() => handleCancel(alarm.id)}>Cancel</button>
-                        )}
-                        {nowSec > alarm.endTimeRaw && (
-                          <button className="btn btn-warning" style={{ padding: '0.5rem' }} onClick={() => handleCheckExpired(alarm.id)}>Check</button>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
+                <AlarmItem 
+                  key={alarm.id} 
+                  alarm={alarm} 
+                  nowSec={nowSec}
+                  onTrigger={handleTrigger}
+                  onCancel={handleCancel}
+                  onCheckExpired={handleCheckExpired}
+                  loading={loading}
+                />
               ))
             )}
           </div>
