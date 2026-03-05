@@ -14,7 +14,8 @@ const CHAIN_CONFIG = {
   },
   11155111: {
     name: "Sepolia",
-    contractAddress: import.meta.env.VITE_CONTRACT_ADDRESS_11155111 || ""
+    contractAddress: import.meta.env.VITE_CONTRACT_ADDRESS_11155111 || 
+                     "0xFC9C9c36EC5BCf851E101B81cF05fd151AA0C4C2"
   }
 }
 
