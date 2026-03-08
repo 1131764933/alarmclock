@@ -136,7 +136,7 @@ import { formatEther, parseEther } from 'ethers'
 // 人类可读格式（wei -> ETH）
 const ethAmount = formatEther(bigIntValue)
 console.log(ethAmount)  // "1.0"
-
+ 
 // 机器格式（ETH -> wei）
 const weiAmount = parseEther("0.01")
 console.log(weiAmount)  // 10000000000000000n

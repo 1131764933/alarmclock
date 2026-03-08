@@ -79,6 +79,11 @@ function App() {
       setAccount(null)
     }
   }
+const handleRefresh = () => {
+  loadAlarms()
+  loadStats()
+  loadContractOwner()
+}
 
   const handleChainChanged = (chainId) => {
     setChainId(parseInt(chainId, 16))
@@ -515,6 +520,7 @@ function App() {
 
       {account && !isSupportedChain && (
         <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+        <button onClick={handleRefresh}>🔄 刷新</button>
           <button className="btn btn-warning" onClick={switchToAnvil}>Switch to Anvil (31337)</button>
         </div>
       )}
